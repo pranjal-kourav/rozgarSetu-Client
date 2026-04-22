@@ -3,7 +3,8 @@ import {T} from "../data/theme.js";
 import { useApp } from "../context/AppContext.jsx";
 
 const Auth = () => {
-    const { nav, login, authMode, setAuthMode, toast } = useApp();
+    const { toast } = useApp();
+    const { nav, login, authMode, setAuthMode } = useApp();
     const [role, setRole] = useState("seeker");
     const [step, setStep] = useState(1);
     const [f, setF] = useState({ name: "", phone: "", email: "", password: "", aadhar: "" });
@@ -57,9 +58,9 @@ const Auth = () => {
                     {(step === 2 || isLogin) && (
                         <div className="fi">
                             {!isLogin && <div className="fg"><label className="fl">Full Name</label><input className="fi2" placeholder="e.g. Ramesh Kumar" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></div>}
-                            <div className="fg"><label className="fl">Mobile Number</label><div className="iw"><span className="ico">📱</span><input className="fi2" placeholder="10-digit number" value={f.phone} onChange={e => setF({ ...f, phone: e.target.value })} maxLength={10} /></div></div>
-                            {!isLogin && <div className="fg"><label className="fl">Email (Optional)</label><input className="fi2" type="email" placeholder="you@email.com" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div>}
-                            <div className="fg"><label className="fl">Password</label><input className="fi2" type="password" placeholder="Create a password" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} /></div>
+                            <div className="fg"><label className="fl">Email Id</label><input className="fi2" type="email" placeholder="you@email.com" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div>
+                            {!isLogin && <div className="fg"><label className="fl">Email</label><input className="fi2" type="email" placeholder="you@email.com" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div>}
+                            <div className="fg"><label className="fl">Password</label><input className="fi2" type="password" placeholder="Enter your password" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} /></div>
                         </div>
                     )}
                     {step === 3 && !isLogin && (
@@ -69,7 +70,6 @@ const Auth = () => {
                                 <div><div className="df" style={{ fontWeight: 700, fontSize: 14 }}>Aadhar Verification</div><div style={{ fontSize: 13, color: T.inkM, marginTop: 3 }}>Used only for identity. Encrypted &amp; never shared.</div></div>
                             </div>
                             <div className="fg"><label className="fl">Aadhar Number</label><input className="fi2" placeholder="XXXX XXXX XXXX" value={f.aadhar} onChange={e => setF({ ...f, aadhar: e.target.value.replace(/\D/g, "").slice(0, 12) })} style={{ letterSpacing: 2 }} /></div>
-                            <div className="fg"><label className="fl">OTP (Demo)</label><input className="fi2" placeholder="Any 6 digits" maxLength={6} /></div>
                         </div>
                     )}
                     <button className="btn bp" style={{ width: "100%", marginTop: 8 }} onClick={next}>

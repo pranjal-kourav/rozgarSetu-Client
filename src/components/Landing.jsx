@@ -9,7 +9,7 @@ const Landing = () => {
         <div>
             {/* HERO */}
             <section className="hero">
-                <div style={{ maxWidth: 960, margin: "0 auto", width: "100%" }} className="fi">
+                <div style={{ maxWidth: 960, margin: "0 auto", width: "100%", padding: 50 }} className="fi">
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: T.saffronL, border: `1px solid ${T.saffron}44`, borderRadius: 50, padding: "5px 14px", marginBottom: 24 }}>
                         <span>🇮🇳</span>
                         <span className="df" style={{ fontWeight: 700, fontSize: 13, color: T.saffronD }}>Made for Bharat's Mid-Urban Workers</span>

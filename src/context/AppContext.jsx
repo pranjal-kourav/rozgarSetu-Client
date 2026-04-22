@@ -13,9 +13,10 @@ export const AppProvider = ({ children }) => {
   const [jobs, setJobs] = useState(JOBS);
   const [gigs, setGigs] = useState(GIGS_INIT);
   const [applicants, setApplicants] = useState(APPS_INIT);
-
+  
   const [authMode, setAuthMode] = useState("login");
   const [notif, setNotif] = useState(null);
+  const [applied, setApplied] = useState([]);
 
   const nav = (p) => {
     setPage(p);
@@ -44,9 +45,9 @@ export const AppProvider = ({ children }) => {
         jobs, gigs, applicants,
         authMode, setAuthMode,
         notif
-      }}
-    >
+      }}>
       {children}
     </Ctx.Provider>
   );
+  
 };
