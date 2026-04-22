@@ -3,7 +3,7 @@ import { JOBS } from "../data/data.js";
 import { useApp } from "../context/AppContext.jsx";
 
 const SeekerDash = () => {
-  const { nav, user, applied } = useApp();
+    const { nav, user, applied = [] } = useApp();
   return (
     <div className="pw fi">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28, flexWrap: "wrap", gap: 14 }}>
@@ -11,7 +11,7 @@ const SeekerDash = () => {
         <button className="btn bp" onClick={() => nav("seeker-gigs")}>⚡ Post a Gig</button>
       </div>
       <div className="g4" style={{ marginBottom: 32 }}>
-        {[{ l: "Jobs Applied", v: applied.length, c: T.saffron }, { l: "Approved", v: 1, c: T.teal }, { l: "Profile Views", v: 18, c: T.cta }, { l: "Avg Rating", v: "4.7★", c: T.gold }].map(s => (
+        {[{ l: "Jobs Applied", v: (applied || []).length, c: T.saffron }, { l: "Approved", v: 1, c: T.teal }, { l: "Profile Views", v: 18, c: T.cta }, { l: "Avg Rating", v: "4.7★", c: T.gold }].map(s => (
           <div key={s.l} className="stc" style={{ borderTop: `3px solid ${s.c}` }}><div className="stn" style={{ color: s.c }}>{s.v}</div><div className="stl">{s.l}</div></div>
         ))}
       </div>

@@ -7,20 +7,80 @@ const Auth = () => {
     const { nav, login, authMode, setAuthMode } = useApp();
     const [role, setRole] = useState("seeker");
     const [step, setStep] = useState(1);
-    const [f, setF] = useState({ name: "", phone: "", email: "", password: "", aadhar: "" });
+    const [f, setF] = useState({ name: "", email: "", password: "", aadhar: "", otp: "" });
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const isLogin = authMode === "login";
 
-    const next = () => {
+    const next = async () => {
+        if (isSubmitting) return;
+
         if (step === 1) { setStep(2); return; }
         if (step === 2) {
             if (!f.name && !isLogin) { toast("Please enter your name", "danger"); return; }
-            if (!f.phone) { toast("Please enter your phone", "danger"); return; }
-            if (isLogin) { login({ name: f.name || "Rajesh Kumar", phone: f.phone }, role); return; }
+            if (!f.email.trim()) { toast("Please enter your email", "danger"); return; }
+            if (!f.password.trim()) { toast("Please enter your password", "danger"); return; }
+
+            if (isLogin) {
+                try {
+                    setIsSubmitting(true);
+                    const res = await fetch("http://localhost:8080/user/login", {
+                        method: "POST",
+                        credentials:"include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            emailId: f.email.trim(),
+                            password: f.password,
+                        }),
+                    });
+
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data?.message || "Login failed");
+
+                    toast("Login successful!", "success");
+                    login(
+                        { name: data?.fullName || data?.user?.fullName || f.email.trim(), email: f.email.trim() },
+                        data?.role || data?.user?.role || role
+                    );
+                } catch (error) {
+                    toast(error.message || "Could not login", "danger");
+                } finally {
+                    setIsSubmitting(false);
+                }
+                return;
+            }
+
             setStep(3); return;
         }
         if (step === 3) {
             if (f.aadhar.length < 12) { toast("Enter valid 12-digit Aadhar", "danger"); return; }
-            login({ name: f.name, phone: f.phone, email: f.email }, role);
+            if (f.otp.trim().length < 4) { toast("Please enter valid OTP", "danger"); return; }
+
+            try {
+                setIsSubmitting(true);
+
+                const signupRes = await fetch("http://localhost:8080/user/create", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        fullName: f.name.trim(),
+                        emailId: f.email.trim(),
+                        password: f.password,
+                        role,
+                        status: "Active",
+                        aadharNumber: Number(f.aadhar),
+                        district: "Gwalior",
+                    }),
+                });
+                const signupData = await signupRes.json().catch(() => ({}));
+                if (!signupRes.ok) throw new Error(signupData?.message || "Signup failed");
+
+                toast("Account created successfully!", "success");
+                login({ name: f.name.trim(), email: f.email.trim() }, role);
+            } catch (error) {
+                toast(error.message || "Could not complete signup", "danger");
+            } finally {
+                setIsSubmitting(false);
+            }
         }
     };
 
@@ -59,7 +119,6 @@ const Auth = () => {
                         <div className="fi">
                             {!isLogin && <div className="fg"><label className="fl">Full Name</label><input className="fi2" placeholder="e.g. Ramesh Kumar" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></div>}
                             <div className="fg"><label className="fl">Email Id</label><input className="fi2" type="email" placeholder="you@email.com" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div>
-                            {!isLogin && <div className="fg"><label className="fl">Email</label><input className="fi2" type="email" placeholder="you@email.com" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div>}
                             <div className="fg"><label className="fl">Password</label><input className="fi2" type="password" placeholder="Enter your password" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} /></div>
                         </div>
                     )}
@@ -70,10 +129,11 @@ const Auth = () => {
                                 <div><div className="df" style={{ fontWeight: 700, fontSize: 14 }}>Aadhar Verification</div><div style={{ fontSize: 13, color: T.inkM, marginTop: 3 }}>Used only for identity. Encrypted &amp; never shared.</div></div>
                             </div>
                             <div className="fg"><label className="fl">Aadhar Number</label><input className="fi2" placeholder="XXXX XXXX XXXX" value={f.aadhar} onChange={e => setF({ ...f, aadhar: e.target.value.replace(/\D/g, "").slice(0, 12) })} style={{ letterSpacing: 2 }} /></div>
+                            <div className="fg"><label className="fl">OTP</label><input className="fi2" placeholder="Enter OTP" maxLength={6} value={f.otp} onChange={e => setF({ ...f, otp: e.target.value.replace(/\D/g, "") })} /></div>
                         </div>
                     )}
-                    <button className="btn bp" style={{ width: "100%", marginTop: 8 }} onClick={next}>
-                        {isLogin ? "Login →" : step === 3 ? "Verify & Complete →" : "Continue →"}
+                    <button className="btn bp" style={{ width: "100%", marginTop: 8 }} onClick={next} disabled={isSubmitting}>
+                        {isSubmitting ? "Submitting..." : isLogin ? "Login →" : step === 3 ? "Verify & Complete →" : "Continue →"}
                     </button>
                     <div style={{ textAlign: "center", marginTop: 16, fontSize: 14, color: T.inkM }}>
                         {isLogin

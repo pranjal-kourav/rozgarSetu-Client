@@ -12,11 +12,16 @@ export const AppProvider = ({ children }) => {
 
   const [jobs, setJobs] = useState(JOBS);
   const [gigs, setGigs] = useState(GIGS_INIT);
+  const [applied, setApplied] = useState([]);
+
   const [applicants, setApplicants] = useState(APPS_INIT);
   
   const [authMode, setAuthMode] = useState("login");
   const [notif, setNotif] = useState(null);
-  const [applied, setApplied] = useState([]);
+  const toast = (msg, type = "info") => {
+    setNotif({ msg, type });
+    setTimeout(() => setNotif(null), 3000);
+  };
 
   const nav = (p) => {
     setPage(p);
@@ -44,7 +49,8 @@ export const AppProvider = ({ children }) => {
         login, logout,
         jobs, gigs, applicants,
         authMode, setAuthMode,
-        notif
+        notif, toast,
+        applied, setApplied
       }}>
       {children}
     </Ctx.Provider>
