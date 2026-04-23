@@ -1,21 +1,170 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {T} from "../data/theme.js";
 import { useApp } from "../context/AppContext.jsx";
 import Stars from "./Stars.jsx";
 
+const API_BASE = "http://localhost:8080";
+
+const emptyProfile = (user, role) => ({
+  userId: "",
+  seekerId: "",
+  serverRole: "",
+  name: user?.name || "",
+  phone: user?.phone || "",
+  email: user?.email || "",
+  bio: "",
+  skills: role === "seeker" ? [] : [],
+  location: "",
+  experience: role === "seeker" ? "—" : "N/A",
+  businessName: "",
+  industry: "",
+  newSkill: "",
+});
+
+const mapApiUserToProfile = (data, role) => {
+  const phone = data?.phoneNumber != null && data.phoneNumber !== "" ? String(data.phoneNumber) : "";
+  const userId = data?._id != null ? String(data._id) : "";
+  const serverRole = typeof data?.role === "string" ? data.role : "";
+  return {
+    userId,
+    seekerId: "",
+    serverRole,
+    name: data?.fullName ?? "",
+    phone,
+    email: data?.emailId ?? "",
+    bio: typeof data?.bio === "string" ? data.bio : "",
+    skills: Array.isArray(data?.skills) ? data.skills : [],
+    location: data?.district ?? "",
+    experience: data?.experience != null && data.experience !== ""
+      ? String(data.experience)
+      : (role === "seeker" ? "—" : "N/A"),
+    businessName: data?.businessName ?? "",
+    industry: data?.industry ?? "",
+    newSkill: "",
+  };
+};
+
+const MONGO_ID_RE = /^[a-f\d]{24}$/i;
+
 const Profile = () => {
-  const { user, role, toast } = useApp();
+  const { user, role, toast, setSeekerId } = useApp();
   const [editing, setEditing] = useState(false);
-  const [pd, setPd] = useState({
-    name: user?.name || "Rajesh Kumar", phone: user?.phone || "9826XXXXXX", email: user?.email || "",
-    bio: role === "hirer" ? "Local business owner hiring skilled workers for various roles." : "Experienced worker with 5+ years across Gwalior. Specialised in domestic wiring and AC repair.",
-    skills: role === "seeker" ? ["Wiring", "AC Repair", "Electrical", "Fuse Box"] : [],
-    location: "Morar, Gwalior", experience: role === "seeker" ? "5 years" : "N/A",
-    businessName: role === "hirer" ? "My Business" : "", industry: role === "hirer" ? "General" : "", newSkill: "",
-  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [loadState, setLoadState] = useState({ status: "idle", message: "" });
+  const [pd, setPd] = useState(() => emptyProfile(user, role));
+
+  useEffect(() => {
+    const emailId = user?.email?.trim();
+    if (!emailId) {
+      setPd(emptyProfile(user, role));
+      setLoadState({ status: "error", message: "No email on account. Log in again." });
+      return;
+    }
+
+    const ac = new AbortController();
+
+    (async () => {
+      setLoadState({ status: "loading", message: "" });
+      try {
+        const res = await fetch(`${API_BASE}/user`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emailId }),
+          signal: ac.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.err || data?.message || "Could not load profile");
+        }
+
+        let nextPd = mapApiUserToProfile(data, role);
+
+        if (role === "seeker" && MONGO_ID_RE.test(nextPd.userId)) {
+          try {
+            const sRes = await fetch(`${API_BASE}/seeker?userId=${encodeURIComponent(nextPd.userId)}`, {
+              method: "GET",
+              credentials: "include",
+              headers: { Accept: "application/json" },
+              signal: ac.signal,
+            });
+            const sData = await sRes.json().catch(() => ({}));
+            if (sRes.ok && sData?._id != null) {
+              nextPd = {
+                ...nextPd,
+                seekerId: String(sData._id),
+                bio: sData.description != null ? String(sData.description) : nextPd.bio,
+              };
+            }
+          } catch {
+            /* ignore seeker fetch errors (e.g. no seeker row yet) */
+          }
+        }
+
+        setPd(nextPd);
+        if (role === "seeker") setSeekerId(nextPd.seekerId || null);
+        else setSeekerId(null);
+        setLoadState({ status: "success", message: "" });
+      } catch (e) {
+        if (e.name === "AbortError") return;
+        setLoadState({ status: "error", message: e.message || "Could not load profile" });
+        setPd(emptyProfile(user, role));
+        setSeekerId(null);
+      }
+    })();
+
+    return () => ac.abort();
+  }, [user?.email, role, setSeekerId]);
 
   const addSkill = () => { if (!pd.newSkill.trim()) return; setPd(p => ({ ...p, skills: [...p.skills, p.newSkill.trim()], newSkill: "" })); };
   const rmSkill = s => setPd(p => ({ ...p, skills: p.skills.filter(x => x !== s) }));
+
+  const saveProfile = async () => {
+    if (isSaving) return;
+
+    if (role === "seeker") {
+      const description = pd.bio.trim();
+      if (!description) {
+        toast("Add something in About before saving.", "danger");
+        return;
+      }
+      if (!MONGO_ID_RE.test(pd.userId)) {
+        toast("User ID is missing or invalid. Reload the page after logging in.", "danger");
+        return;
+      }
+
+      try {
+        setIsSaving(true);
+        const res = await fetch(`${API_BASE}/seeker/create`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: pd.userId,
+            description,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.err || data?.message || "Could not save profile");
+        }
+        if (data?.Id != null) {
+          const sid = String(data.Id);
+          setPd(p => ({ ...p, seekerId: sid }));
+          setSeekerId(sid);
+        }
+        setEditing(false);
+        toast("Profile saved!", "success");
+      } catch (e) {
+        toast(e.message || "Could not save profile", "danger");
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
+    setEditing(false);
+    toast("Profile updated!", "success");
+  };
 
   const reviews = [
     { n: "Ramesh Sharma", r: 5, t: "Excellent work! Very professional.", d: "Apr 10" },
@@ -27,26 +176,48 @@ const Profile = () => {
   const hirerStats = [{ l: "Jobs Posted", v: "5", c: T.saffron }, { l: "Active Hirings", v: "2", c: T.teal }, { l: "Reviews Given", v: "8", c: T.cta }, { l: "Avg Rating", v: "4.5 ★", c: T.gold }];
   const stats = role === "seeker" ? seekerStats : hirerStats;
 
+  const roleLabel = pd.serverRole
+    ? (pd.serverRole === "hirer" ? "Hirer" : pd.serverRole === "seeker" ? "Worker (Seeker)" : pd.serverRole)
+    : "—";
+
   const personalFields = [
-    ["👤", "Name", pd.name], ["📱", "Phone", pd.phone], ["📧", "Email", pd.email || "Not provided"], ["📍", "Location", pd.location],
+    ["🪪", "User ID", pd.userId || "—"],
+    ...(role === "seeker" ? [["🆔", "Seeker ID", pd.seekerId || "—"]] : []),
+    ["🎭", "Role", roleLabel],
+    ["👤", "Name", pd.name || "—"], ["📱", "Phone", pd.phone || "—"], ["📧", "Email", pd.email || "Not provided"], ["📍", "Location", pd.location || "—"],
     ...(role === "seeker" ? [["🏆", "Experience", pd.experience]] : []),
     ...(role === "hirer" ? [["🏢", "Business", pd.businessName || "Not set"], ["🏭", "Industry", pd.industry || "Not set"]] : []),
   ];
 
+  const bannerRoleChip = pd.serverRole === "hirer" ? "🏢 Hirer" : pd.serverRole === "seeker" ? "🔧 Worker" : (role === "hirer" ? "🏢 Hirer" : "🔧 Worker");
+
+  const displayBio = pd.bio.trim() ? pd.bio : "No bio added yet.";
+  const initialLetter = (pd.name || user?.email || "?").trim().charAt(0).toUpperCase();
+
   return (
     <div className="pw fi">
+      {loadState.status === "loading" && (
+        <div style={{ marginBottom: 16, padding: "12px 16px", background: T.saffronL, borderRadius: 12, border: `1px solid ${T.border}`, color: T.inkM, fontSize: 14 }}>
+          Loading profile…
+        </div>
+      )}
+      {loadState.status === "error" && loadState.message && (
+        <div style={{ marginBottom: 16, padding: "12px 16px", background: T.badL, borderRadius: 12, border: `1px solid ${T.bad}44`, color: T.bad, fontSize: 14 }}>
+          {loadState.message}
+        </div>
+      )}
       {/* Banner */}
       <div style={{ background: `linear-gradient(135deg,${T.saffron},${T.saffronD})`, borderRadius: 20, padding: "28px 24px", marginBottom: 24, position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", top: -30, right: -30, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,.06)", pointerEvents: "none" }} />
         <div style={{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ width: 80, height: 80, borderRadius: "50%", border: "3px solid #fff", background: T.saffronL, color: T.saffron, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Baloo 2',cursive", fontWeight: 800, fontSize: 28, flexShrink: 0 }}>
-            {pd.name.charAt(0)}
+            {initialLetter}
           </div>
           <div style={{ flex: 1 }}>
-            <div className="df" style={{ fontSize: 24, fontWeight: 800, color: "#fff" }}>{pd.name}</div>
-            <div style={{ color: "rgba(255,255,255,.8)", fontSize: 14, marginTop: 3 }}>{pd.location}{role === "seeker" ? ` · ${pd.experience} exp.` : ""}</div>
+            <div className="df" style={{ fontSize: 24, fontWeight: 800, color: "#fff" }}>{pd.name || "—"}</div>
+            <div style={{ color: "rgba(255,255,255,.8)", fontSize: 14, marginTop: 3 }}>{pd.location || "—"}{role === "seeker" ? ` · ${pd.experience} exp.` : ""}</div>
             <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-              {[role === "hirer" ? "🏢 Hirer" : "🔧 Worker", "★ 4.7 · 12 reviews", "✓ Aadhar Verified"].map(t => (
+              {[bannerRoleChip, "★ 4.7 · 12 reviews", "✓ Aadhar Verified"].map(t => (
                 <span key={t} style={{ background: "rgba(255,255,255,.2)", color: "#fff", padding: "3px 12px", borderRadius: 20, fontSize: 13 }}>{t}</span>
               ))}
             </div>
@@ -64,6 +235,9 @@ const Profile = () => {
             <div className="df" style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>Personal Details</div>
             {editing ? (
               <>
+                <div className="fg"><label className="fl">User ID</label><input className="fi2" value={pd.userId} readOnly style={{ background: T.sand, color: T.inkM }} /></div>
+                {role === "seeker" && <div className="fg"><label className="fl">Seeker ID</label><input className="fi2" value={pd.seekerId} readOnly placeholder="—" style={{ background: T.sand, color: T.inkM }} /></div>}
+                <div className="fg"><label className="fl">Role</label><input className="fi2" value={roleLabel} readOnly style={{ background: T.sand, color: T.inkM }} /></div>
                 <div className="fg"><label className="fl">Full Name</label><input className="fi2" value={pd.name} onChange={e => setPd(p => ({ ...p, name: e.target.value }))} /></div>
                 <div className="fg"><label className="fl">Phone Number</label><input className="fi2" value={pd.phone} onChange={e => setPd(p => ({ ...p, phone: e.target.value }))} /></div>
                 <div className="fg"><label className="fl">Email</label><input className="fi2" type="email" value={pd.email} placeholder="your@email.com" onChange={e => setPd(p => ({ ...p, email: e.target.value }))} /></div>
@@ -94,7 +268,13 @@ const Profile = () => {
           {/* Bio */}
           <div className="cf">
             <div className="df" style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>About</div>
-            {editing ? <textarea className="fi2" value={pd.bio} onChange={e => setPd(p => ({ ...p, bio: e.target.value }))} rows={4} /> : <p style={{ fontSize: 14, color: T.inkM, lineHeight: 1.8 }}>{pd.bio}</p>}
+            {editing ? <textarea className="fi2" value={pd.bio} onChange={e => setPd(p => ({ ...p, bio: e.target.value }))} rows={4} placeholder="Tell others about yourself…" /> : <p style={{ fontSize: 14, color: T.inkM, lineHeight: 1.8 }}>{displayBio}</p>}
+            {role === "seeker" && (
+              <div style={{ fontSize: 13, color: T.inkM, marginTop: 10, lineHeight: 1.5 }}>
+                <span style={{ fontWeight: 700, color: T.ink }}>Seeker ID:</span>{" "}
+                <span style={{ fontFamily: "ui-monospace, monospace", wordBreak: "break-all" }}>{pd.seekerId || "—"}</span>
+              </div>
+            )}
           </div>
 
           {/* Skills (seekers only) */}
@@ -118,7 +298,9 @@ const Profile = () => {
           )}
 
           {editing && (
-            <button className="btn bp" onClick={() => { setEditing(false); toast("Profile updated!", "success"); }}>💾 Save Profile</button>
+            <button className="btn bp" onClick={saveProfile} disabled={isSaving}>
+              {isSaving ? "Saving…" : "💾 Save Profile"}
+            </button>
           )}
         </div>
 
