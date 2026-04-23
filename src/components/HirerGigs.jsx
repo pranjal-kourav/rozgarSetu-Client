@@ -1,19 +1,113 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {T} from "../data/theme.js";
 import { SEEKERS } from "../data/data.js";
 import { useApp } from "../context/AppContext.jsx";
+import Stars from "./Stars.jsx";
+
+const API_BASE = "http://localhost:8080";
 
 const HirerGigs = () => {
-  const { nav, gigs, openCall, viewProfile, contacted, setContacted, toast } = useApp();
+  const { nav, openCall, viewProfile, contacted, setContacted, toast } = useApp();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("recent");
+  const [apiGigs, setApiGigs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [openingGigId, setOpeningGigId] = useState("");
 
-  const list = gigs
+  useEffect(() => {
+    const ac = new AbortController();
+    (async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetch(`${API_BASE}/hirer/gigs`, {
+          method: "GET",
+          credentials: "include",
+          headers: { Accept: "application/json" },
+          signal: ac.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.err || data?.message || "Could not load gigs");
+        setApiGigs(Array.isArray(data?.data) ? data.data : []);
+      } catch (e) {
+        if (e.name === "AbortError") return;
+        setApiGigs([]);
+        setError(e.message || "Could not load gigs");
+      } finally {
+        setLoading(false);
+      }
+    })();
+    return () => ac.abort();
+  }, []);
+
+  const mappedGigs = useMemo(() => {
+    return apiGigs.map((g) => {
+      const fallbackSeeker = SEEKERS.find((s) => String(s.id) === String(g.seekerId));
+      const title = g?.title ? String(g.title) : "Untitled Gig";
+      const category = g?.category ? String(g.category) : "General";
+      const location = g?.location ? String(g.location) : "Not specified";
+      const seekerName = fallbackSeeker?.name || "Seeker";
+      const seekerRating = Number(g?.avgRating ?? fallbackSeeker?.rating ?? 0);
+      return {
+        id: g?._id != null ? String(g._id) : String(Math.random()),
+        seekerId: g?.seekerId != null ? String(g.seekerId) : "",
+        title,
+        seeker: seekerName,
+        seekerRating,
+        posted: g?.status ? String(g.status) : "Active",
+        location,
+        duration: g?.startingFrom ? `From ${g.startingFrom}` : "Flexible",
+        pay: g?.hourlyRate != null ? Number(g.hourlyRate) : 0,
+        payUnit: "hour",
+        skills: [category],
+        available: g?.status !== "Paused",
+        phone: fallbackSeeker?.phone || "",
+      };
+    });
+  }, [apiGigs]);
+
+  const list = mappedGigs
     .filter(g => g.available && (!search || g.title.toLowerCase().includes(search.toLowerCase()) || g.seeker.toLowerCase().includes(search.toLowerCase()) || g.location.toLowerCase().includes(search.toLowerCase()) || g.skills.some(s => s.toLowerCase().includes(search.toLowerCase()))))
     .sort((a, b) => sort === "rating" ? b.seekerRating - a.seekerRating : 0);
 
   const contact = (id) => {
     if (!contacted.includes(id)) { setContacted(p => [...p, id]); toast("Seeker notified!", "success"); }
+  };
+
+  const openGigProfile = async (gig) => {
+    const gigId = String(gig?.id || "");
+    if (!gigId) {
+      toast("Gig ID is missing", "danger");
+      return;
+    }
+    try {
+      setOpeningGigId(gigId);
+      const res = await fetch(`${API_BASE}/hirer/gig/${encodeURIComponent(gigId)}`, {
+        method: "GET",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.err || data?.message || "Could not load profile details");
+      viewProfile(gig.seekerId, "seeker", {
+        role: "seeker",
+        user: data?.user || null,
+        gig: {
+          id: gig.id,
+          title: gig.title,
+          location: gig.location,
+          duration: gig.duration,
+          pay: gig.pay,
+          payUnit: gig.payUnit,
+          skills: gig.skills,
+        },
+      });
+    } catch (e) {
+      toast(e.message || "Could not load profile details", "danger");
+    } finally {
+      setOpeningGigId("");
+    }
   };
 
   return (
@@ -38,16 +132,26 @@ const HirerGigs = () => {
           </select>
         </div>
       </div>
-      {list.length === 0 ? (
+      {loading && (
+        <div style={{ textAlign: "center", padding: "40px 20px", color: T.inkM }}>
+          <div className="df" style={{ fontWeight: 700, fontSize: 18 }}>Loading gigs...</div>
+        </div>
+      )}
+      {!loading && error && (
+        <div style={{ textAlign: "center", padding: "40px 20px", color: T.bad }}>
+          <div className="df" style={{ fontWeight: 700, fontSize: 18 }}>Could not load gigs</div>
+          <p style={{ marginTop: 6, color: T.inkM }}>{error}</p>
+        </div>
+      )}
+      {!loading && !error && list.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 20px", color: T.inkM }}>
           <div style={{ fontSize: 52, marginBottom: 12 }}>⚡</div>
           <div className="df" style={{ fontWeight: 700, fontSize: 20 }}>No gigs found</div>
           <p style={{ marginTop: 6 }}>Try adjusting your search</p>
         </div>
-      ) : (
+      ) : !loading && !error ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {list.map(gig => {
-            const seeker = SEEKERS.find(s => s.id === gig.seekerId);
             return (
               <div key={gig.id} className="card" style={{ cursor: "default" }}>
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
@@ -69,24 +173,19 @@ const HirerGigs = () => {
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>{gig.skills.map(s => <span key={s} className="stag">{s}</span>)}</div>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
-                    <button className="btn bg sm" onClick={() => seeker && openCall(gig.seeker, seeker.phone)}>📞 Call</button>
-                    <button className={`btn sm ${contacted.includes(gig.id) ? "bg" : "bp"}`} onClick={() => contact(gig.id)} style={{ cursor: contacted.includes(gig.id) ? "default" : "pointer" }}>
-                      {contacted.includes(gig.id) ? "✓ Sent" : "📨 Contact"}
+                  <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-start", gap: 8, flexShrink: 0 }}>
+                    <button className="btn bt sm" onClick={() => openGigProfile(gig)} disabled={openingGigId === gig.id}>
+                      {openingGigId === gig.id ? "Loading..." : "📨 Contact"}
                     </button>
-                    <button className="btn bt sm" onClick={() => viewProfile(gig.seekerId, "seeker")}>View Profile →</button>
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
-
-// Stars is used inline here — import from Stars.jsx in actual implementation
-import Stars from "./Stars.jsx";
 
 export default HirerGigs;

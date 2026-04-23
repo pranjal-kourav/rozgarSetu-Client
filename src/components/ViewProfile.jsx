@@ -1,18 +1,36 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {T} from "../data/theme.js";
 import { useApp } from "../context/AppContext.jsx";
 import Stars from "./Stars.jsx";
 
 const Profile = () => {
-    const { user, role, toast } = useApp();
+    const { user, role, toast, viewProfileData } = useApp();
+    const viewedRole = viewProfileData?.role || role;
     const [editing, setEditing] = useState(false);
     const [pd, setPd] = useState({
         name: user?.name || "Rajesh Kumar", phone: user?.phone || "9826XXXXXX", email: user?.email || "",
-        bio: role === "hirer" ? "Local business owner hiring skilled workers for various roles." : "Experienced worker with 5+ years across Gwalior. Specialised in domestic wiring and AC repair.",
-        skills: role === "seeker" ? ["Wiring", "AC Repair", "Electrical", "Fuse Box"] : [],
-        location: "Morar, Gwalior", experience: role === "seeker" ? "5 years" : "N/A",
-        businessName: role === "hirer" ? "My Business" : "", industry: role === "hirer" ? "General" : "", newSkill: "",
+        bio: viewedRole === "hirer" ? "Local business owner hiring skilled workers for various roles." : "Experienced worker with 5+ years across Gwalior. Specialised in domestic wiring and AC repair.",
+        skills: viewedRole === "seeker" ? ["Wiring", "AC Repair", "Electrical", "Fuse Box"] : [],
+        location: "Morar, Gwalior", experience: viewedRole === "seeker" ? "5 years" : "N/A",
+        businessName: viewedRole === "hirer" ? "My Business" : "", industry: viewedRole === "hirer" ? "General" : "", newSkill: "",
     });
+
+    useEffect(() => {
+        const apiUser = viewProfileData?.user;
+        if (!apiUser) return;
+        setPd((p) => ({
+            ...p,
+            name: apiUser?.fullName ?? p.name,
+            phone: apiUser?.phoneNumber != null ? String(apiUser.phoneNumber) : p.phone,
+            email: apiUser?.emailId ?? p.email,
+            location: apiUser?.district ?? p.location,
+            bio: viewProfileData?.gig?.title
+                ? `Gig: ${viewProfileData.gig.title}${viewProfileData?.gig?.skills?.length ? ` (${viewProfileData.gig.skills.join(", ")})` : ""}`
+                : (apiUser?.bio ?? p.bio),
+            skills: Array.isArray(apiUser?.skills) && apiUser.skills.length ? apiUser.skills : p.skills,
+            experience: apiUser?.experience != null ? String(apiUser.experience) : p.experience,
+        }));
+    }, [viewProfileData]);
 
     const addSkill = () => { if (!pd.newSkill.trim()) return; setPd(p => ({ ...p, skills: [...p.skills, p.newSkill.trim()], newSkill: "" })); };
     const rmSkill = s => setPd(p => ({ ...p, skills: p.skills.filter(x => x !== s) }));
@@ -25,12 +43,12 @@ const Profile = () => {
 
     const seekerStats = [{ l: "Total Earnings", v: "₹45,200", c: T.teal }, { l: "Jobs Completed", v: "12", c: T.saffron }, { l: "Experience", v: pd.experience, c: T.cta }, { l: "Rating", v: "4.7 ★", c: T.gold }];
     const hirerStats = [{ l: "Jobs Posted", v: "5", c: T.saffron }, { l: "Active Hirings", v: "2", c: T.teal }, { l: "Reviews Given", v: "8", c: T.cta }, { l: "Avg Rating", v: "4.5 ★", c: T.gold }];
-    const stats = role === "seeker" ? seekerStats : hirerStats;
+    const stats = viewedRole === "seeker" ? seekerStats : hirerStats;
 
     const personalFields = [
         ["👤", "Name", pd.name], ["📱", "Phone", pd.phone], ["📧", "Email", pd.email || "Not provided"], ["📍", "Location", pd.location],
-        ...(role === "seeker" ? [["🏆", "Experience", pd.experience]] : []),
-        ...(role === "hirer" ? [["🏢", "Business", pd.businessName || "Not set"], ["🏭", "Industry", pd.industry || "Not set"]] : []),
+        ...(viewedRole === "seeker" ? [["🏆", "Experience", pd.experience]] : []),
+        ...(viewedRole === "hirer" ? [["🏢", "Business", pd.businessName || "Not set"], ["🏭", "Industry", pd.industry || "Not set"]] : []),
     ];
 
     return (
@@ -44,9 +62,9 @@ const Profile = () => {
                     </div>
                     <div style={{ flex: 1 }}>
                         <div className="df" style={{ fontSize: 24, fontWeight: 800, color: "#fff" }}>{pd.name}</div>
-                        <div style={{ color: "rgba(255,255,255,.8)", fontSize: 14, marginTop: 3 }}>{pd.location}{role === "seeker" ? ` · ${pd.experience} exp.` : ""}</div>
+                        <div style={{ color: "rgba(255,255,255,.8)", fontSize: 14, marginTop: 3 }}>{pd.location}{viewedRole === "seeker" ? ` · ${pd.experience} exp.` : ""}</div>
                         <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-                            {[role === "hirer" ? "🏢 Hirer" : "🔧 Worker", "★ 4.7 · 12 reviews", "✓ Aadhar Verified"].map(t => (
+                            {[viewedRole === "hirer" ? "🏢 Hirer" : "🔧 Worker", "★ 4.7 · 12 reviews", "✓ Aadhar Verified"].map(t => (
                                 <span key={t} style={{ background: "rgba(255,255,255,.2)", color: "#fff", padding: "3px 12px", borderRadius: 20, fontSize: 13 }}>{t}</span>
                             ))}
                         </div>
@@ -68,8 +86,8 @@ const Profile = () => {
                                 <div className="fg"><label className="fl">Phone Number</label><input className="fi2" value={pd.phone} onChange={e => setPd(p => ({ ...p, phone: e.target.value }))} /></div>
                                 <div className="fg"><label className="fl">Email</label><input className="fi2" type="email" value={pd.email} placeholder="your@email.com" onChange={e => setPd(p => ({ ...p, email: e.target.value }))} /></div>
                                 <div className="fg"><label className="fl">Location</label><input className="fi2" value={pd.location} onChange={e => setPd(p => ({ ...p, location: e.target.value }))} /></div>
-                                {role === "seeker" && <div className="fg"><label className="fl">Experience</label><input className="fi2" value={pd.experience} placeholder="e.g. 5 years" onChange={e => setPd(p => ({ ...p, experience: e.target.value }))} /></div>}
-                                {role === "hirer" && (
+                                {viewedRole === "seeker" && <div className="fg"><label className="fl">Experience</label><input className="fi2" value={pd.experience} placeholder="e.g. 5 years" onChange={e => setPd(p => ({ ...p, experience: e.target.value }))} /></div>}
+                                {viewedRole === "hirer" && (
                                     <>
                                         <div className="fg"><label className="fl">Business Name</label><input className="fi2" value={pd.businessName} placeholder="Your business name" onChange={e => setPd(p => ({ ...p, businessName: e.target.value }))} /></div>
                                         <div className="fg"><label className="fl">Industry</label><input className="fi2" value={pd.industry} placeholder="e.g. IT, Trading, Security" onChange={e => setPd(p => ({ ...p, industry: e.target.value }))} /></div>
@@ -98,7 +116,7 @@ const Profile = () => {
                     </div>
 
                     {/* Skills (seekers only) */}
-                    {role === "seeker" && (
+                    {viewedRole === "seeker" && (
                         <div className="cf">
                             <div className="df" style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>Skills</div>
                             <div style={{ display: "flex", flexWrap: "wrap" }}>

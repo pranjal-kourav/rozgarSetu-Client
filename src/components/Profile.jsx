@@ -8,6 +8,7 @@ const API_BASE = "http://localhost:8080";
 const emptyProfile = (user, role) => ({
   userId: "",
   seekerId: "",
+  hirerId: "",
   serverRole: "",
   name: user?.name || "",
   phone: user?.phone || "",
@@ -28,6 +29,7 @@ const mapApiUserToProfile = (data, role) => {
   return {
     userId,
     seekerId: "",
+    hirerId: "",
     serverRole,
     name: data?.fullName ?? "",
     phone,
@@ -47,7 +49,7 @@ const mapApiUserToProfile = (data, role) => {
 const MONGO_ID_RE = /^[a-f\d]{24}$/i;
 
 const Profile = () => {
-  const { user, role, toast, setSeekerId } = useApp();
+  const { user, role, toast, setSeekerId, setHirerId } = useApp();
   const [editing, setEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [loadState, setLoadState] = useState({ status: "idle", message: "" });
@@ -100,20 +102,50 @@ const Profile = () => {
           }
         }
 
+        if (role === "hirer" && MONGO_ID_RE.test(nextPd.userId)) {
+          try {
+            const hRes = await fetch(`${API_BASE}/hirer/${encodeURIComponent(nextPd.userId)}`, {
+              method: "GET",
+              credentials: "include",
+              headers: { Accept: "application/json" },
+              signal: ac.signal,
+            });
+            const hData = await hRes.json().catch(() => ({}));
+            if (hRes.ok) {
+              nextPd = {
+                ...nextPd,
+                hirerId: hData?._id != null ? String(hData._id) : nextPd.hirerId,
+                bio: hData?.address != null ? String(hData.address) : nextPd.bio,
+              };
+            }
+          } catch {
+            /* ignore hirer fetch errors (e.g. no hirer row yet) */
+          }
+        }
+
         setPd(nextPd);
-        if (role === "seeker") setSeekerId(nextPd.seekerId || null);
-        else setSeekerId(null);
+        if (role === "seeker") {
+          setSeekerId(nextPd.seekerId || null);
+          setHirerId(null);
+        } else if (role === "hirer") {
+          setHirerId(nextPd.hirerId || null);
+          setSeekerId(null);
+        } else {
+          setSeekerId(null);
+          setHirerId(null);
+        }
         setLoadState({ status: "success", message: "" });
       } catch (e) {
         if (e.name === "AbortError") return;
         setLoadState({ status: "error", message: e.message || "Could not load profile" });
         setPd(emptyProfile(user, role));
         setSeekerId(null);
+        setHirerId(null);
       }
     })();
 
     return () => ac.abort();
-  }, [user?.email, role, setSeekerId]);
+  }, [user?.email, role, setSeekerId, setHirerId]);
 
   const addSkill = () => { if (!pd.newSkill.trim()) return; setPd(p => ({ ...p, skills: [...p.skills, p.newSkill.trim()], newSkill: "" })); };
   const rmSkill = s => setPd(p => ({ ...p, skills: p.skills.filter(x => x !== s) }));
@@ -162,6 +194,47 @@ const Profile = () => {
       return;
     }
 
+    if (role === "hirer") {
+      const address = pd.bio.trim();
+      if (!address) {
+        toast("Please enter your address.", "danger");
+        return;
+      }
+      if (!MONGO_ID_RE.test(pd.userId)) {
+        toast("User ID is missing or invalid. Reload the page after logging in.", "danger");
+        return;
+      }
+
+      try {
+        setIsSaving(true);
+        const res = await fetch(`${API_BASE}/hirer/create`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: pd.userId,
+            address,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.err || data?.message || "Could not save profile");
+        }
+        if (data?.Id != null) {
+          const hid = String(data.Id);
+          setPd(p => ({ ...p, hirerId: hid }));
+          setHirerId(hid);
+        }
+        setEditing(false);
+        toast(data?.msg ? String(data.msg) : "Profile saved!", "success");
+      } catch (e) {
+        toast(e.message || "Could not save profile", "danger");
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
     setEditing(false);
     toast("Profile updated!", "success");
   };
@@ -183,6 +256,7 @@ const Profile = () => {
   const personalFields = [
     ["🪪", "User ID", pd.userId || "—"],
     ...(role === "seeker" ? [["🆔", "Seeker ID", pd.seekerId || "—"]] : []),
+    ...(role === "hirer" ? [["🆔", "Hirer ID", pd.hirerId || "—"]] : []),
     ["🎭", "Role", roleLabel],
     ["👤", "Name", pd.name || "—"], ["📱", "Phone", pd.phone || "—"], ["📧", "Email", pd.email || "Not provided"], ["📍", "Location", pd.location || "—"],
     ...(role === "seeker" ? [["🏆", "Experience", pd.experience]] : []),
@@ -192,6 +266,7 @@ const Profile = () => {
   const bannerRoleChip = pd.serverRole === "hirer" ? "🏢 Hirer" : pd.serverRole === "seeker" ? "🔧 Worker" : (role === "hirer" ? "🏢 Hirer" : "🔧 Worker");
 
   const displayBio = pd.bio.trim() ? pd.bio : "No bio added yet.";
+  const addressOrBioDisplay = role === "hirer" ? (pd.bio.trim() ? pd.bio : "No address added yet.") : displayBio;
   const initialLetter = (pd.name || user?.email || "?").trim().charAt(0).toUpperCase();
 
   return (
@@ -237,6 +312,7 @@ const Profile = () => {
               <>
                 <div className="fg"><label className="fl">User ID</label><input className="fi2" value={pd.userId} readOnly style={{ background: T.sand, color: T.inkM }} /></div>
                 {role === "seeker" && <div className="fg"><label className="fl">Seeker ID</label><input className="fi2" value={pd.seekerId} readOnly placeholder="—" style={{ background: T.sand, color: T.inkM }} /></div>}
+                {role === "hirer" && <div className="fg"><label className="fl">Hirer ID</label><input className="fi2" value={pd.hirerId} readOnly placeholder="—" style={{ background: T.sand, color: T.inkM }} /></div>}
                 <div className="fg"><label className="fl">Role</label><input className="fi2" value={roleLabel} readOnly style={{ background: T.sand, color: T.inkM }} /></div>
                 <div className="fg"><label className="fl">Full Name</label><input className="fi2" value={pd.name} onChange={e => setPd(p => ({ ...p, name: e.target.value }))} /></div>
                 <div className="fg"><label className="fl">Phone Number</label><input className="fi2" value={pd.phone} onChange={e => setPd(p => ({ ...p, phone: e.target.value }))} /></div>
@@ -268,11 +344,27 @@ const Profile = () => {
           {/* Bio */}
           <div className="cf">
             <div className="df" style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>Address</div>
-            {editing ? <textarea className="fi2" value={pd.bio} onChange={e => setPd(p => ({ ...p, bio: e.target.value }))} rows={4} placeholder="Tell others about yourself…" /> : <p style={{ fontSize: 14, color: T.inkM, lineHeight: 1.8 }}>{displayBio}</p>}
+            {editing ? (
+              <textarea
+                className="fi2"
+                value={pd.bio}
+                onChange={e => setPd(p => ({ ...p, bio: e.target.value }))}
+                rows={4}
+                placeholder={role === "hirer" ? "Street, area, city, PIN…" : "Tell others about yourself…"}
+              />
+            ) : (
+              <p style={{ fontSize: 14, color: T.inkM, lineHeight: 1.8 }}>{addressOrBioDisplay}</p>
+            )}
             {role === "seeker" && (
               <div style={{ fontSize: 13, color: T.inkM, marginTop: 10, lineHeight: 1.5 }}>
                 <span style={{ fontWeight: 700, color: T.ink }}>Seeker ID:</span>{" "}
                 <span style={{ fontFamily: "ui-monospace, monospace", wordBreak: "break-all" }}>{pd.seekerId || "—"}</span>
+              </div>
+            )}
+            {role === "hirer" && (
+              <div style={{ fontSize: 13, color: T.inkM, marginTop: 10, lineHeight: 1.5 }}>
+                <span style={{ fontWeight: 700, color: T.ink }}>Hirer ID:</span>{" "}
+                <span style={{ fontFamily: "ui-monospace, monospace", wordBreak: "break-all" }}>{pd.hirerId || "—"}</span>
               </div>
             )}
           </div>
