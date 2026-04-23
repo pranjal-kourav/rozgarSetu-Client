@@ -7,7 +7,7 @@ const Auth = () => {
     const { nav, login, authMode, setAuthMode } = useApp();
     const [role, setRole] = useState("seeker");
     const [step, setStep] = useState(1);
-    const [f, setF] = useState({ name: "", email: "", password: "", aadhar: "", phoneNumber: "" });
+    const [f, setF] = useState({ name: "", email: "", password: "", aadhar: "", phoneNumber: "", district: "" });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const isLogin = authMode === "login";
 
@@ -55,6 +55,7 @@ const Auth = () => {
         if (step === 3) {
             if (f.aadhar.length < 12) { toast("Enter valid 12-digit Aadhar", "danger"); return; }
             if (!f.phoneNumber) { toast("phone Number required"); return; }
+            if (!f.district.trim()) { toast("Please enter district", "danger"); return; }
 
             try {
                 setIsSubmitting(true);
@@ -70,7 +71,7 @@ const Auth = () => {
                         role,
                         status: "Active",
                         aadharNumber: Number(f.aadhar),
-                        district: "Gwalior",
+                        district: f.district.trim(),
                     }),
                 });
                 const signupData = await signupRes.json().catch(() => ({}));
@@ -161,6 +162,16 @@ const Auth = () => {
                                         phoneNumber: e.target.value.replace(/\D/g, "").slice(0, 10)
                                     })
                                 }
+                            />
+                        </div>
+
+                        <div className="fg">
+                            <label className="fl">District</label>
+                            <input
+                                className="fi2"
+                                placeholder="e.g. Gwalior"
+                                value={f.district}
+                                onChange={e => setF({ ...f, district: e.target.value })}
                             />
                         </div>
                     

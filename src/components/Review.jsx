@@ -29,7 +29,7 @@ const Review = () => {
       <div className="cf">
         <div style={{ display: "flex", gap: 14, alignItems: "center", padding: 16, background: T.sand, borderRadius: 12, marginBottom: 24 }}>
           <div style={{ width: 48, height: 48, borderRadius: "50%", background: T.saffronL, color: T.saffron, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Baloo 2',cursive", fontWeight: 800, fontSize: 18 }}>S</div>
-          <div><div className="df" style={{ fontWeight: 700 }}>Suresh Yadav</div><div style={{ fontSize: 13, color: T.inkM }}>Electrician · Completed Apr 14</div></div>
+          <div><div className="df" style={{ fontWeight: 700 }}></div><div style={{ fontSize: 13, color: T.inkM }}>Electrician · Completed Apr 14</div></div>
         </div>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <div className="df" style={{ fontWeight: 700, fontSize: 18, marginBottom: 16 }}>How was the work?</div>

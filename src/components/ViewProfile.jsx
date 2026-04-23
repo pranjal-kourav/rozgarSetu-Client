@@ -41,7 +41,7 @@ const Profile = () => {
         { n: "TechSeva Ltd", r: 5, t: "Highly recommended. Will hire again!", d: "Mar 5" },
     ];
 
-    const seekerStats = [{ l: "Total Earnings", v: "₹45,200", c: T.teal }, { l: "Jobs Completed", v: "12", c: T.saffron }, { l: "Experience", v: pd.experience, c: T.cta }, { l: "Rating", v: "4.7 ★", c: T.gold }];
+    const seekerStats = [{ l: "Total Earnings", v: "₹1,500", c: T.teal }, { l: "Jobs Completed", v: "0", c: T.saffron }, { l: "Experience", v: pd.experience, c: T.cta }, { l: "Rating", v: "4.7 ★", c: T.gold }];
     const hirerStats = [{ l: "Jobs Posted", v: "5", c: T.saffron }, { l: "Active Hirings", v: "2", c: T.teal }, { l: "Reviews Given", v: "8", c: T.cta }, { l: "Avg Rating", v: "4.5 ★", c: T.gold }];
     const stats = viewedRole === "seeker" ? seekerStats : hirerStats;
 
@@ -64,7 +64,7 @@ const Profile = () => {
                         <div className="df" style={{ fontSize: 24, fontWeight: 800, color: "#fff" }}>{pd.name}</div>
                         <div style={{ color: "rgba(255,255,255,.8)", fontSize: 14, marginTop: 3 }}>{pd.location}{viewedRole === "seeker" ? ` · ${pd.experience} exp.` : ""}</div>
                         <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-                            {[viewedRole === "hirer" ? "🏢 Hirer" : "🔧 Worker", "★ 4.7 · 12 reviews", "✓ Aadhar Verified"].map(t => (
+                            {[viewedRole === "hirer" ? "🏢 Hirer" : "🔧 Worker", "★ 0 · 0 reviews", "✓ Aadhar Verified"].map(t => (
                                 <span key={t} style={{ background: "rgba(255,255,255,.2)", color: "#fff", padding: "3px 12px", borderRadius: 20, fontSize: 13 }}>{t}</span>
                             ))}
                         </div>
