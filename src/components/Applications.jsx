@@ -19,10 +19,13 @@ const prettySalary = (salary) => {
 };
 
 const Applications = () => {
-  const { hirerId, toast, nav } = useApp();
+  const { hirerId, toast, nav, viewProfile } = useApp();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedJobId, setSelectedJobId] = useState("");
+  const [loadingApplicantsFor, setLoadingApplicantsFor] = useState("");
+  const [applicantsByJob, setApplicantsByJob] = useState({});
 
   useEffect(() => {
     if (!MONGO_ID_RE.test(String(hirerId || ""))) {
@@ -65,6 +68,42 @@ const Applications = () => {
     const urgent = jobs.filter((j) => Boolean(j?.urgentHiring)).length;
     return { total, open, urgent };
   }, [jobs]);
+
+  const handleManageApplicants = async (jobId) => {
+    const id = String(jobId || "");
+    if (!MONGO_ID_RE.test(id)) {
+      toast("Invalid job id", "danger");
+      return;
+    }
+    if (!MONGO_ID_RE.test(String(hirerId || ""))) {
+      toast("Hirer ID missing. Open Profile once.", "danger");
+      return;
+    }
+    if (selectedJobId === id) {
+      setSelectedJobId("");
+      return;
+    }
+    if (applicantsByJob[id]) {
+      setSelectedJobId(id);
+      return;
+    }
+    try {
+      setLoadingApplicantsFor(id);
+      const res = await fetch(`${API_BASE}/hirer/see-applicants/${encodeURIComponent(id)}?hirerId=${encodeURIComponent(hirerId)}`, {
+        method: "GET",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.err || data?.message || "Could not load applicants");
+      setApplicantsByJob((p) => ({ ...p, [id]: Array.isArray(data?.applicants) ? data.applicants : [] }));
+      setSelectedJobId(id);
+    } catch (e) {
+      toast(e.message || "Could not load applicants", "danger");
+    } finally {
+      setLoadingApplicantsFor("");
+    }
+  };
 
   return (
     <div className="pw fi">
@@ -126,9 +165,37 @@ const Applications = () => {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end", flexShrink: 0 }}>
                   <span style={{ fontSize: 12, color: T.inkM }}>Applicants: {Array.isArray(j.appliedBy) ? j.appliedBy.length : 0}</span>
-                  <button className="btn bg sm" onClick={() => nav("applications")}>Manage</button>
+                  <button className="btn bg sm" onClick={() => handleManageApplicants(j._id)} disabled={loadingApplicantsFor === String(j._id)}>
+                    {loadingApplicantsFor === String(j._id) ? "Loading..." : selectedJobId === String(j._id) ? "Hide" : "Manage"}
+                  </button>
                 </div>
               </div>
+              {selectedJobId === String(j._id) && (
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
+                  <div className="df" style={{ fontSize: 15, marginBottom: 10 }}>Applicants</div>
+                  {(applicantsByJob[String(j._id)] || []).length === 0 ? (
+                    <p style={{ margin: 0, fontSize: 13, color: T.inkM }}>No one has applied yet.</p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {(applicantsByJob[String(j._id)] || []).map((a) => (
+                        <div key={a.seekerId} style={{ background: T.sand, borderRadius: 10, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                          <div style={{ minWidth: 180 }}>
+                            <div className="df" style={{ fontSize: 14 }}>{a.name || "Applicant"}</div>
+                            <div style={{ fontSize: 12, color: T.inkM, marginTop: 3 }}>{a.district || "—"} {a.phone ? `· ${a.phone}` : ""}</div>
+                            {a.description ? <div style={{ fontSize: 12, color: T.inkM, marginTop: 3 }}>{a.description}</div> : null}
+                          </div>
+                          <button
+                            className="btn bp sm"
+                            onClick={() => viewProfile(a.seekerId, "seeker", { role: "seeker", user: { fullName: a.name, phoneNumber: a.phone, emailId: a.email, district: a.district }, seeker: { _id: a.seekerId, description: a.description || "" } })}
+                          >
+                            View Profile
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
