@@ -26,6 +26,8 @@ const Applications = () => {
   const [selectedJobId, setSelectedJobId] = useState("");
   const [loadingApplicantsFor, setLoadingApplicantsFor] = useState("");
   const [applicantsByJob, setApplicantsByJob] = useState({});
+  const [approvingKey, setApprovingKey] = useState("");
+  const [selectedSeekerByJob, setSelectedSeekerByJob] = useState({});
 
   useEffect(() => {
     if (!MONGO_ID_RE.test(String(hirerId || ""))) {
@@ -102,6 +104,42 @@ const Applications = () => {
       toast(e.message || "Could not load applicants", "danger");
     } finally {
       setLoadingApplicantsFor("");
+    }
+  };
+
+  const handleApproveApplicant = async (jobId, seekerId) => {
+    const jid = String(jobId || "");
+    const sid = String(seekerId || "");
+    if (!MONGO_ID_RE.test(jid) || !MONGO_ID_RE.test(sid)) {
+      toast("Invalid applicant or job id", "danger");
+      return;
+    }
+    if (!MONGO_ID_RE.test(String(hirerId || ""))) {
+      toast("Hirer ID missing. Open Profile once.", "danger");
+      return;
+    }
+
+    const key = `${jid}:${sid}`;
+    try {
+      setApprovingKey(key);
+      const res = await fetch(`${API_BASE}/hirer/select-applicant/${encodeURIComponent(jid)}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          seekerId: sid,
+          hirerId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.err || data?.message || "Could not approve applicant");
+
+      setSelectedSeekerByJob((p) => ({ ...p, [jid]: sid }));
+      toast(data?.msg || "Applicant approved successfully", "success");
+    } catch (e) {
+      toast(e.message || "Could not approve applicant", "danger");
+    } finally {
+      setApprovingKey("");
     }
   };
 
@@ -184,12 +222,25 @@ const Applications = () => {
                             <div style={{ fontSize: 12, color: T.inkM, marginTop: 3 }}>{a.district || "—"} {a.phone ? `· ${a.phone}` : ""}</div>
                             {a.description ? <div style={{ fontSize: 12, color: T.inkM, marginTop: 3 }}>{a.description}</div> : null}
                           </div>
-                          <button
-                            className="btn bp sm"
-                            onClick={() => viewProfile(a.seekerId, "seeker", { role: "seeker", user: { fullName: a.name, phoneNumber: a.phone, emailId: a.email, district: a.district }, seeker: { _id: a.seekerId, description: a.description || "" } })}
-                          >
-                            View Profile
-                          </button>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                            <button
+                              className={`btn sm ${selectedSeekerByJob[String(j._id)] === String(a.seekerId) ? "bok" : "bp"}`}
+                              onClick={() => handleApproveApplicant(j._id, a.seekerId)}
+                              disabled={approvingKey === `${String(j._id)}:${String(a.seekerId)}` || selectedSeekerByJob[String(j._id)] === String(a.seekerId)}
+                            >
+                              {approvingKey === `${String(j._id)}:${String(a.seekerId)}`
+                                ? "Approving..."
+                                : selectedSeekerByJob[String(j._id)] === String(a.seekerId)
+                                  ? "✓ Approved"
+                                  : "Approve"}
+                            </button>
+                            <button
+                              className="btn bp sm"
+                              onClick={() => viewProfile(a.seekerId, "seeker", { role: "seeker", user: { fullName: a.name, phoneNumber: a.phone, emailId: a.email, district: a.district }, seeker: { _id: a.seekerId, description: a.description || "" } })}
+                            >
+                              View Profile
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
