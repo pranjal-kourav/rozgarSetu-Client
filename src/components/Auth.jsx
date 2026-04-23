@@ -1,5 +1,5 @@
 import { useState } from "react";
-import {T} from "../data/theme.js";
+import { T } from "../data/theme.js";
 import { useApp } from "../context/AppContext.jsx";
 
 const Auth = () => {
@@ -7,7 +7,7 @@ const Auth = () => {
     const { nav, login, authMode, setAuthMode } = useApp();
     const [role, setRole] = useState("seeker");
     const [step, setStep] = useState(1);
-    const [f, setF] = useState({ name: "", email: "", password: "", aadhar: "", otp: "" });
+    const [f, setF] = useState({ name: "", email: "", password: "", aadhar: "", phoneNumber: "" });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const isLogin = authMode === "login";
 
@@ -19,13 +19,14 @@ const Auth = () => {
             if (!f.name && !isLogin) { toast("Please enter your name", "danger"); return; }
             if (!f.email.trim()) { toast("Please enter your email", "danger"); return; }
             if (!f.password.trim()) { toast("Please enter your password", "danger"); return; }
+            
 
             if (isLogin) {
                 try {
                     setIsSubmitting(true);
                     const res = await fetch("http://localhost:8080/user/login", {
                         method: "POST",
-                        credentials:"include",
+                        credentials: "include",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                             emailId: f.email.trim(),
@@ -53,7 +54,7 @@ const Auth = () => {
         }
         if (step === 3) {
             if (f.aadhar.length < 12) { toast("Enter valid 12-digit Aadhar", "danger"); return; }
-            if (f.otp.trim().length < 4) { toast("Please enter valid OTP", "danger"); return; }
+            if (!f.phoneNumber) { toast("phone Number required"); return; }
 
             try {
                 setIsSubmitting(true);
@@ -65,6 +66,7 @@ const Auth = () => {
                         fullName: f.name.trim(),
                         emailId: f.email.trim(),
                         password: f.password,
+                        phoneNumber: Number(f.phoneNumber),
                         role,
                         status: "Active",
                         aadharNumber: Number(f.aadhar),
@@ -124,13 +126,62 @@ const Auth = () => {
                     )}
                     {step === 3 && !isLogin && (
                         <div className="fi">
-                            <div style={{ background: T.goldL, border: `1px solid ${T.gold}44`, borderRadius: 12, padding: 14, marginBottom: 18, display: "flex", gap: 10 }}>
-                                <span style={{ fontSize: 20 }}>🛡️</span>
-                                <div><div className="df" style={{ fontWeight: 700, fontSize: 14 }}>Aadhar Verification</div><div style={{ fontSize: 13, color: T.inkM, marginTop: 3 }}>Used only for identity. Encrypted &amp; never shared.</div></div>
+
+                        {/* Aadhar Info Box */}
+                        <div style={{
+                            background: T.goldL,
+                            border: `1px solid ${T.gold}44`,
+                            borderRadius: 12,
+                            padding: 14,
+                            marginBottom: 18,
+                            display: "flex",
+                            gap: 10
+                        }}>
+                            <span style={{ fontSize: 20 }}>🛡️</span>
+                            <div>
+                                <div className="df" style={{ fontWeight: 700, fontSize: 14 }}>
+                                    Aadhar Verification
+                                </div>
+                                <div style={{ fontSize: 13, color: T.inkM, marginTop: 3 }}>
+                                    Used only for identity. Encrypted &amp; never shared.
+                                </div>
                             </div>
-                            <div className="fg"><label className="fl">Aadhar Number</label><input className="fi2" placeholder="XXXX XXXX XXXX" value={f.aadhar} onChange={e => setF({ ...f, aadhar: e.target.value.replace(/\D/g, "").slice(0, 12) })} style={{ letterSpacing: 2 }} /></div>
-                            <div className="fg"><label className="fl">OTP</label><input className="fi2" placeholder="Enter OTP" maxLength={6} value={f.otp} onChange={e => setF({ ...f, otp: e.target.value.replace(/\D/g, "") })} /></div>
                         </div>
+                    
+                        {/* Phone Number Field */}
+                        <div className="fg">
+                            <label className="fl">Phone Number</label>
+                            <input
+                                className="fi2"
+                                placeholder="10-digit mobile number"
+                                value={f.phoneNumber}
+                                onChange={e =>
+                                    setF({
+                                        ...f,
+                                        phoneNumber: e.target.value.replace(/\D/g, "").slice(0, 10)
+                                    })
+                                }
+                            />
+                        </div>
+                    
+                        {/* Aadhar Field */}
+                        <div className="fg">
+                            <label className="fl">Aadhar Number</label>
+                            <input
+                                className="fi2"
+                                placeholder="XXXX XXXX XXXX"
+                                value={f.aadhar}
+                                onChange={e =>
+                                    setF({
+                                        ...f,
+                                        aadhar: e.target.value.replace(/\D/g, "").slice(0, 12)
+                                    })
+                                }
+                                style={{ letterSpacing: 2 }}
+                            />
+                        </div>
+                    
+                    </div>
                     )}
                     <button className="btn bp" style={{ width: "100%", marginTop: 8 }} onClick={next} disabled={isSubmitting}>
                         {isSubmitting ? "Submitting..." : isLogin ? "Login →" : step === 3 ? "Verify & Complete →" : "Continue →"}
@@ -143,7 +194,7 @@ const Auth = () => {
                 </div>
                 <div style={{ textAlign: "center", marginTop: 16 }}><button onClick={() => nav("landing")} style={{ color: T.inkM, fontSize: 13, background: "none", border: "none", cursor: "pointer" }}>← Back to Home</button></div>
             </div>
-        </div>
+        </div >
     );
 };
 

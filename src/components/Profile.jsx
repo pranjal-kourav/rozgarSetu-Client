@@ -267,7 +267,7 @@ const Profile = () => {
 
           {/* Bio */}
           <div className="cf">
-            <div className="df" style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>About</div>
+            <div className="df" style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>Address</div>
             {editing ? <textarea className="fi2" value={pd.bio} onChange={e => setPd(p => ({ ...p, bio: e.target.value }))} rows={4} placeholder="Tell others about yourself…" /> : <p style={{ fontSize: 14, color: T.inkM, lineHeight: 1.8 }}>{displayBio}</p>}
             {role === "seeker" && (
               <div style={{ fontSize: 13, color: T.inkM, marginTop: 10, lineHeight: 1.5 }}>
