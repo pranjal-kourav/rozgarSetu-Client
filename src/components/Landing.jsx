@@ -9,15 +9,15 @@ const Landing = () => {
         <div>
             {/* HERO */}
             <section className="hero">
-                <div style={{ maxWidth: 960, margin: "0 auto", width: "100%", padding: 50 }} className="fi">
+                <div style={{ maxWidth: 960, margin: "0 auto", width: "100%", padding:25 }} className="fi">
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: T.saffronL, border: `1px solid ${T.saffron}44`, borderRadius: 50, padding: "5px 14px", marginBottom: 24 }}>
                         <span>🇮🇳</span>
                         <span className="df" style={{ fontWeight: 700, fontSize: 13, color: T.saffronD }}>Made for Bharat's Mid-Urban Workers</span>
                     </div>
                     <h1 className="htitle" style={{ marginBottom: 20 }}>
-                        Kaam Chahiye?<br />
-                        <span style={{ color: T.saffron }}>Rozgar</span><span style={{ color: T.cta }}>setu</span> Par<br />
-                        Milega Zaroor.
+                    Looking for work?<br />
+                        <span style={{ color: T.saffron }}>On Rozgarsetu,</span><span style={{ color: T.cta }}></span> You’ll<br />
+                        definitely find it.
                     </h1>
                     <p style={{ fontSize: 18, color: T.inkM, maxWidth: 520, lineHeight: 1.7, marginBottom: 36 }}>
                         India's fastest platform connecting <strong style={{ color: T.saffron }}>skilled workers</strong> and <strong style={{ color: T.ctaD }}>local hirers</strong> in Tier-2 &amp; Tier-3 cities.
